@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quản lý chi tiêu</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+    <style>
+      body { background-color: #f8f9fa; }
+      .card { box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); border: none; }
+      .card-header { background-color: #fff; border-bottom: 1px solid #eee; font-weight: 600; }
+      .stat-card .card-body { text-align: right; }
+      .stat-card .card-title { font-size: 2rem; }
+      .stat-card .card-text { font-size: 1rem; color: #6c757d; }
+    </style>
+</head>
+<body class="py-4">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="{{ url_for('home') }}">
+            <i class="fas fa-wallet text-primary"></i> Expense Tracker
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+                {% if current_user.is_authenticated %}
+                    <li class="nav-item">
+                        <span class="navbar-text me-3">Hi, <strong>{{ current_user.username }}</strong>!</span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('manage_categories') }}"><i class="fas fa-tags"></i> Categories</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </li>
+                {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('login') }}"><i class="fas fa-sign-in-alt"></i> Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('register') }}"><i class="fas fa-user-plus"></i> Register</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</nav>
+
+    <main class="container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <div class="row mb-4">
+        <div class="col-md-4"><div class="card stat-card"><div class="card-body"><p class="card-text">Total Spend</p><h4 class="card-title text-danger">{{ "{:,.0f}".format(total) }} <span class="fs-6 fw-normal">VND</span></h4></div></div></div>
+        <div class="col-md-4"><div class="card stat-card"><div class="card-body"><p class="card-text">Transactions</p><h4 class="card-title text-primary">{{ count }}</h4></div></div></div>
+        <div class="col-md-4"><div class="card stat-card"><div class="card-body"><p class="card-text">Average Spend</p><h4 class="card-title text-info">{{ "{:,.0f}".format(average) }}<span class="fs-6 fw-normal">VND</span></h4></div></div></div>
+      </div>
+
+      <!-- === FORM Add New Expense (Corrected and Enhanced) === -->
+<div class="card mb-4">
+    <div class="card-header">
+      <a class="text-decoration-none" data-bs-toggle="collapse" href="#addTransactionCollapse" role="button" aria-expanded="true" aria-controls="addTransactionCollapse">
+        <b><i class="fas fa-plus-circle"></i> Add New Expense</b>
+      </a>
+    </div>
+    <div class="collapse show" id="addTransactionCollapse">
+      <div class="card-body">
+        <form action="{{ url_for('add_transaction') }}" method="POST">
+          <!-- Main row for form inputs -->
+          <div class="row g-3 align-items-end">
+
+            <!-- Date Input -->
+            <div class="col-md-6 col-lg-3">
+              <label for="date" class="form-label small">Date</label>
+              <input type="date" class="form-control" name="date" id="date" value="{{ today_date }}" required>
+            </div>
+
+            <!-- Description Input -->
+            <div class="col-md-6 col-lg-4">
+              <label for="description" class="form-label small">Description</label>
+              <input type="text" class="form-control" id="description" name="description" placeholder="E.g., Coffee, Python book..." required />
+            </div>
+
+            <!-- Amount Input -->
+            <div class="col-md-6 col-lg-2">
+              <label for="amount" class="form-label small">Amount</label>
+              <input type="number" class="form-control" id="amount" name="amount" placeholder="E.g., 50000" required />
+            </div>
+            
+            <!-- Category Select (Dropdown) -->
+            <div class="col-md-6 col-lg-3">
+                <label for="category_id" class="form-label small">Category</label>            
+                <select class="form-select" id="category_id" name="category_id" required>
+                  <option value="" selected disabled>-- Select --</option>
+                  {% for category in categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}
+                </select>
+                <!-- "Quick Add" link -->
+                <a href="#" id="add-category-toggle" class="btn btn-link btn-sm p-0 mt-1" style="font-size: 0.8em;">+ Add new category</a>
+            </div>
+
+            <!-- Hidden form for "Quick Add" -->
+            <div class="col-12">
+                <div id="add-category-form" style="display: none;" class="input-group input-group-sm mt-2">
+                    <input type="text" id="new-category-name" class="form-control" placeholder="New category name...">
+                    <button class="btn btn-success" type="button" id="save-category-btn">Save</button>
+                    <button class="btn btn-secondary" type="button" id="cancel-add-category-btn">Cancel</button>
+                </div>
+            </div>
+
+          </div> <!-- End of main input row -->
+
+          <!-- Submit Button on its own row for emphasis -->
+          <div class="row mt-3">
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary w-100">Add to Ledger</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+</div>
+      <div class="row">
+        <div class="col-lg-8">
+          <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+              <b><i class="fas fa-list-alt"></i> Lịch sử chi tiêu</b>
+              <form action="{{ url_for('home') }}" method="GET" class="row g-2 align-items-center">
+                <div class="col-auto">
+                  <select name="category" class="form-select form-select-sm">
+                    <option value="">Tất cả</option>
+                    {% for c in categories %}<option value="{{ c.id }}" {% if selected_category and selected_category == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+                  </select>
+                </div>
+                <div class="col-auto">
+                  <input type="month" name="month" class="form-control form-control-sm" value="{{ selected_month or '' }}">
+                </div>
+                <div class="col-auto">
+                  <button type="submit" class="btn btn-sm btn-outline-primary">Lọc</button>
+                </div>
+              </form>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                  <thead>
+                    <tr>
+                      <th>Day</th>
+                      <th>Describe</th>
+                      <th class="text-center">Category</th>
+                      <th class="text-end">Amount</th>
+                      <th class="text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% if transactions %}
+                      {% for t in transactions %}
+                        <tr>
+                          <td>{{ t.date.strftime('%d/%m/%Y') }}</td>
+                          <td>{{ t.description }}</td>
+                          <td class="text-center"><span class="badge rounded-pill bg-info text-dark">{{ t.category.name }}</span></td>
+                          <td class="text-end fw-bold">{{ "{:,.0f}".format(t.amount) }}</td>
+                          <td class="text-center">
+                            <a href="{{ url_for('edit_transaction', id=t.id) }}" class="btn btn-outline-warning btn-sm py-0 px-1" title="Sửa"><i class="fas fa-pen"></i></a>
+                            <form action="{{ url_for('delete_transaction', id=t.id) }}" method="POST" class="d-inline">
+                              <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1" title="Xóa" onclick="return confirm('Bạn có chắc chắn muốn xóa mục này?')"><i class="fas fa-trash"></i></button>
+                            </form>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    {% else %}
+                      {% if selected_month or selected_category %}
+                        <tr><td colspan="5" class="text-center text-muted p-5"><div class="mb-2"><i class="fas fa-search-minus fa-3x"></i></div><h5>Không tìm thấy kết quả</h5><p class="small">Hãy thử thay đổi hoặc xóa bớt bộ lọc.</p></td></tr>
+                      {% else %}
+                        <tr><td colspan="5" class="text-center text-muted p-5"><div class="mb-2"><i class="fas fa-folder-open fa-3x"></i></div><h5>Chưa có dữ liệu</h5><p class="small">Hãy bắt đầu bằng cách thêm một chi tiêu mới ở trên.</p></td></tr>
+                      {% endif %}
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+
+              {% if pagination and pagination.pages > 1 %}
+                <div class="card-footer bg-white d-flex justify-content-center pt-3">
+                  <nav>
+                    <ul class="pagination">
+                      <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('home', page=pagination.prev_num, month=selected_month, category=selected_category) }}">« Trước</a></li>
+                      {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if p %}
+                          <li class="page-item {% if p == pagination.page %}active{% endif %}"><a class="page-link" href="{{ url_for('home', page=p, month=selected_month, category=selected_category) }}">{{ p }}</a></li>
+                        {% else %}
+                          <li class="page-item disabled"><span class="page-link">…</span></li>
+                        {% endif %}
+                      {% endfor %}
+                      <li class="page-item {% if not pagination.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('home', page=pagination.next_num, month=selected_month, category=selected_category) }}">Sau »</a></li>
+                    </ul>
+                  </nav>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="card">
+            <div class="card-header"><b><i class="fas fa-chart-pie"></i> Phân bổ chi tiêu</b></div>
+            <div class="card-body"><canvas id="myChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="text-center text-muted mt-5 mb-3">My Expense Tracker Project © 2024</footer>
+    </main>
+
+    
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+
+        
+        let myChart = null;
+        async function drawChart() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiUrl = `/api/chart-data?${urlParams.toString()}`;
+            
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const chartData = await response.json();
+                const ctx = document.getElementById('myChart').getContext('2d');
+                if (myChart) myChart.destroy();
+
+                if (chartData.data.length === 0) {
+                    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    ctx.font = '16px Arial';
+                    ctx.fillStyle = '#aaa';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('No data to display', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                    return;
+                }
+
+                myChart = new Chart(ctx, {
+                   type: 'doughnut',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: [{
+                            label: 'Expense',
+                            data: chartData.data,
+                            backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'],
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { padding: 15 }
+                            },
+
+                        tooltip: {
+                          callbacks: {
+                            label: function(context){
+                              let label = context.label || '';
+                              if(label){
+                                label += ': ';
+                              }
+                              if (context.parsed != null){
+                                label += new Intl.NumberFormat('vi-VN', {style: 'currency', currency: 'VND'}).format(context.parsed);
+                              }
+                              return label;
+                            }
+                          }
+                        }
+                      }
+                    }
+                  });
+            }catch (error) {
+                console.error("Could not draw chart:", error);
+            }
+        }
+        drawChart();
+
+        
+        const addCategoryToggle = document.getElementById('add-category-toggle');
+        const addCategoryForm = document.getElementById('add-category-form');
+        const newCategoryNameInput = document.getElementById('new-category-name');
+        const saveCategoryBtn = document.getElementById('save-category-btn');
+        const cancelCategoryBtn = document.getElementById('cancel-add-category-btn');
+        const categorySelect = document.getElementById('category_id');
+
+        if (addCategoryToggle) {
+            addCategoryToggle.addEventListener('click', (event) => {
+                event.preventDefault(); 
+                addCategoryForm.style.display = 'flex'; 
+                addCategoryToggle.style.display = 'none'; 
+                newCategoryNameInput.focus(); 
+            });
+        }
+
+        if (cancelCategoryBtn) {
+            cancelCategoryBtn.addEventListener('click', () => {
+                addCategoryForm.style.display = 'none'; 
+                addCategoryToggle.style.display = 'inline'; 
+                newCategoryNameInput.value = ''; 
+            });
+        }
+
+        if (saveCategoryBtn) {
+            saveCategoryBtn.addEventListener('click', async () => {
+                const newName = newCategoryNameInput.value.trim();
+                if (!newName) {
+                    alert('Please enter a category name.');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/add_category', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: newName })
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        const newCategory = result.category;
+                        const option = new Option(newCategory.name, newCategory.id, true, true);
+                        categorySelect.add(option);
+                        cancelCategoryBtn.click();
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Failed to add category:', error);
+                    alert('An unexpected error occurred. Please try again.');
+                }
+            });
+        }
+    });
+</script>
+</body>
+</html>
