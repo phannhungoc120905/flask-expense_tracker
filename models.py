@@ -23,6 +23,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), index=True, unique=True, nullable=False)
     password_hash = db.Column(db.String(256))
+    monthly_budget = db.Column(db.Float, nullable=True, default=0)
 
     transactions = db.relationship('Transaction', backref='author', lazy='dynamic')
     categories = db.relationship('Category', backref='author', lazy='dynamic')

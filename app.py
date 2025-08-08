@@ -81,8 +81,7 @@ def home():
     query = Transaction.query.filter_by(author=current_user)
 
     # --- Lọc theo tháng ---
-    selected_month_str = request.args.get('month')
-    selected_month = None
+    selected_month_str = request.args.get('month','')
     if selected_month_str and len(selected_month_str) == 7:
         try:
             selected_month = datetime.strptime(selected_month_str, '%Y-%m').date()
@@ -103,6 +102,12 @@ def home():
     average_amount = query.with_entities(db.func.avg(Transaction.amount)).scalar() or 0
     transaction_count = query.with_entities(db.func.count()).scalar() or 0
 
+    budget = current_user.monthly_budget
+    percent_spent = 0
+    if budget and budget > 0:
+        percent_spent = (total_amount / budget) * 100
+        percent_spent = round(percent_spent, 2)
+
     # --- Phân trang ---
     page = request.args.get('page', 1, type=int)
     transactions = query.order_by(Transaction.date.desc()).paginate(page=page, per_page=5)
@@ -116,7 +121,9 @@ def home():
                            average=average_amount,
                            count=transaction_count,
                            selected_month=selected_month_str,
-                           selected_category_id=selected_category_id)
+                           selected_category_id=selected_category_id,
+                           budget=budget,
+                           percent_spent=percent_spent,)
 
 @app.route('/api/chart-data')
 @login_required
@@ -266,6 +273,28 @@ def api_add_category():
 @login_required
 def manage_categories():
     return "This is the page to manage categories."
+
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    if request.method == 'POST':
+        try:
+            new_budget_str = request.form.get('budget', '0').strip()
+            new_budget = float(new_budget_str)
+
+            if new_budget < 0:
+                flash('The budget cannot be negative!','danger')
+            else:
+                current_user.monthly_budget = new_budget
+                db.session.commit()
+                flash('Budget updated successfully!', 'success')
+            
+            return redirect(url_for('profile'))
+        except ValueError:
+            flash('Please enter a valid number for the budget.', 'danger')
+            return redirect(url_for('profile'))
+    
+    return render_template('profile.html', title='My Profile')
 @app.cli.command('seed-db')
 def seed_db():
     sample_categories = ['Ăn uống', 'Giải trí', 'Học tập', 'Đi lại', 'Mua sắm']
